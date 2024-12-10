@@ -7,6 +7,7 @@ from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv 
 from prompt_toolkit import prompt  # ✅ Imported directly
 from prompt_toolkit.styles import Style
+from word2number import w2n  # ✅ Import word2number
 
 # -------------------------------
 # Configuration
@@ -54,23 +55,19 @@ sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
 # Utility Functions
 # -------------------------------
 
-word_to_number = {
-    'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
-    'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
-    'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14, 
-    'fifteen': 15, 'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 
-    'nineteen': 19, 'twenty': 20
-}
-
 def extract_number_from_text(text):
     """Extracts the first number (word or digit) from the user's query. Defaults to 3 if no number is found."""
+    # Extract digit-based numbers (like 1, 2, 10, etc.)
     digit_numbers = re.findall(r'\d+', text)
     if digit_numbers:
-        return int(digit_numbers[0])
+        return int(digit_numbers[0])  # Return the first number found
     
+    # Extract number words (like "one", "twelve", "twenty-one")
     for word in text.split():
-        if word.lower() in word_to_number:
-            return word_to_number[word.lower()]
+        try:
+            return w2n.word_to_num(word)  # Use word2number to convert
+        except ValueError:
+            pass  # If the word isn't a number, move to the next one
 
     return 3  # Default to 3 if no number is found
 
@@ -82,18 +79,18 @@ def chatbot():
     print("\n🌯 Welcome to the Dublin Burrito Bot!")
     print("❓ Ask me anything about burrito restaurants (e.g., 'Where can I get a spicy burrito in Dublin?').\n")
     #print("Type 'exit' to quit.\n")
-    
+
     style = Style.from_dict({
         'prompt': 'bold #00FFFF',  # Cyan prompt text
-        '': 'bold #FFA500'    # Orange input text
+        '': 'bold #FFA500'          # Orange input text
     })
 
     while True:
         user_input = prompt('You: ', style=style)
         #print(f"You said: {user_input}\n")
-        print(f"\n")
+        print("\n")
 
-        if user_input.lower() in ['exit', 'quit','bah']:
+        if user_input.lower() in ['exit', 'quit', 'bah']:
             print("👋 Goodbye!\n")
             break
 
@@ -111,9 +108,15 @@ def chatbot():
             print(f"❌ Error during rephrasing: {e}")
             continue
 
+        # Extract number of burrito spots to recommend
         num_recommendations = extract_number_from_text(user_input)
+        
+        # Log the extracted number
+        #print(f"🔢 Extracted number of recommendations: {num_recommendations} (default: 3)")
+
         query_embedding = sentence_model.encode([search_query])
         
+        # Set k to be the number of recommendations, bounded between 1 and 20
         k = max(1, min(20, num_recommendations))
         distances, indices = index.search(query_embedding, k)
 

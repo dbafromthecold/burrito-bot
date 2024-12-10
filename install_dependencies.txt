@@ -8,3 +8,7 @@ pip install sentence-transformers
 pip install openai faiss-cpu pandas
 
 pip install python-dotenv
+
+pip install prompt_toolkit
+
+pip install word2number
