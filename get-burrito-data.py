@@ -5,7 +5,7 @@ from dotenv import load_dotenv  # ✅ Load .env file
 
 load_dotenv()
 
-# Set up Yelp API details
+# set up Yelp API details
 API_KEY = os.getenv('YELP_API_KEY')
 headers = {'Authorization': f'Bearer {API_KEY}'}
 
@@ -23,11 +23,13 @@ def fetch_burrito_restaurants(city, limit=50):
         print(f"Failed to fetch data for {city}. Status code: {response.status_code}")
         return []
 
-# List of cities you want to pull burrito restaurant data for
+# list of cities you want to pull burrito restaurant data for
 #cities = ['Los Angeles', 'San Francisco', 'Austin', 'New York','Dublin']
+
+# limiting to Dublin for initial testing
 cities = ['Dublin']
 
-# Collect data for each city
+# collect data for each city
 all_restaurants = []
 for city in cities:
     restaurants = fetch_burrito_restaurants(city)
@@ -42,10 +44,10 @@ for city in cities:
             'url': restaurant.get('url', 'N/A')
         })
 
-# Convert to DataFrame
+# convert to DataFrame
 df = pd.DataFrame(all_restaurants)
 
-# Save to a CSV file
+# save to a CSV file
 df.to_csv('dublin_burrito_restaurants.csv', index=False)
 
 print("Data saved to 'dublin_burrito_restaurants.csv'")

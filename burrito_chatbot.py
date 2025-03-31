@@ -1,166 +1,184 @@
 import os
 import re
+import json
 import openai
 import faiss
 import pandas as pd
 from sentence_transformers import SentenceTransformer
-from dotenv import load_dotenv 
-from prompt_toolkit import prompt  # ✅ Imported directly
+from dotenv import load_dotenv
+from prompt_toolkit import prompt
 from prompt_toolkit.styles import Style
-from word2number import w2n  # ✅ Import word2number
 
-# -------------------------------
-# Configuration
-# -------------------------------
-
+# set csv and index files
 CSV_FILE = 'processed_burrito_data.csv'
 FAISS_INDEX_FILE = 'burrito_index.faiss'
 
-load_dotenv()  # Load .env file
+# load variables from .env file
+load_dotenv()
 
-# Get the API Key, Organization, and Project from the environment variables
+# set variables from .env file
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 OPENAI_ORG = os.getenv('OPENAI_ORG')
 OPENAI_PROJECT = os.getenv('OPENAI_PROJECT')
 
-# Initialize the OpenAI client
+# initialize the OpenAI client
 client = openai.Client(
     api_key=OPENAI_API_KEY,
     organization=OPENAI_ORG,
     project=OPENAI_PROJECT
 )
 
-# -------------------------------
-# Step 1: Load the Data and FAISS Index
-# -------------------------------
-
+# load the processed data
 if not os.path.exists(CSV_FILE):
-    raise FileNotFoundError(f"CSV file '{CSV_FILE}' not found. Please ensure it's in the current directory.")
-if not os.path.exists(FAISS_INDEX_FILE):
-    raise FileNotFoundError(f"FAISS index file '{FAISS_INDEX_FILE}' not found. Please ensure it's in the current directory.")
-
-# Load the processed burrito data CSV
+    raise FileNotFoundError(f"CSV file '{CSV_FILE}' not found.")
 df = pd.read_csv(CSV_FILE)
 
-# Load the FAISS index
+# load the FAISS index
+if not os.path.exists(FAISS_INDEX_FILE):
+    raise FileNotFoundError(f"FAISS index file '{FAISS_INDEX_FILE}' not found.")
 index = faiss.read_index(FAISS_INDEX_FILE)
 
-# -------------------------------
-# Step 2: Load SentenceTransformer Model
-# -------------------------------
-
+# load sentence transformer model
 sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# -------------------------------
-# Utility Functions
-# -------------------------------
+# keep track of shown results across the session
+shown_indices = set()
+last_min_rating = 0
+last_preferences = []
+last_location = ""
 
-def extract_number_from_text(text):
-    """Extracts the first number (word or digit) from the user's query. Defaults to 3 if no number is found."""
-    # Extract digit-based numbers (like 1, 2, 10, etc.)
-    digit_numbers = re.findall(r'\d+', text)
-    if digit_numbers:
-        return int(digit_numbers[0])  # Return the first number found
-    
-    # Extract number words (like "one", "twelve", "twenty-one")
-    for word in text.split():
-        try:
-            return w2n.word_to_num(word)  # Use word2number to convert
-        except ValueError:
-            pass  # If the word isn't a number, move to the next one
-
-    return 3  # Default to 3 if no number is found
-
-# -------------------------------
-# Step 3: Chatbot Function
-# -------------------------------
-
+# chatbot function
 def chatbot():
     print("\n🌯 Welcome to the Dublin Burrito Bot!")
-    print("❓ Ask me anything about burrito restaurants (e.g., 'Where can I get a spicy burrito in Dublin?').\n")
-    #print("Type 'exit' to quit.\n")
+    print("❓ Ask me anything about burrito restaurants (e.g., 'I want 3 spicy burrito places with 4+ stars').\n")
 
     style = Style.from_dict({
-        'prompt': 'bold #00FFFF',  # Cyan prompt text
-        '': 'bold #FFA500'          # Orange input text
+        'prompt': 'bold #00FFFF',
+        '': 'bold #FFA500'
     })
+
+    global shown_indices, last_min_rating, last_preferences, last_location
 
     while True:
         user_input = prompt('You: ', style=style)
-        #print(f"You said: {user_input}\n")
         print("\n")
 
         if user_input.lower() in ['exit', 'quit', 'bah']:
             print("👋 Goodbye!\n")
             break
 
-        query_prompt = f"Rephrase this query to make it simple and clear for searching burrito restaurant descriptions: '{user_input}'"
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{
-                    "role": "user",
-                    "content": [{"type": "text", "text": query_prompt}]
-                }]
-            )
-            search_query = response.choices[0].message.content.strip()
-        except Exception as e:
-            print(f"❌ Error during rephrasing: {e}")
-            continue
+        is_followup = user_input.strip().lower() in ["give me another one", "another one", "show me more", "more"]
 
-        # Extract number of burrito spots to recommend
-        num_recommendations = extract_number_from_text(user_input)
-        
-        # Log the extracted number
-        #print(f"🔢 Extracted number of recommendations: {num_recommendations} (default: 3)")
+        if is_followup:
+            num_results = 1
+        else:
+            # Step 1: Use GPT to extract structured query intent
+            analysis_prompt = f"""
+You are a helpful assistant for a burrito restaurant search bot.
+Your job is to extract user intent and return it as a JSON object.
 
-        query_embedding = sentence_model.encode([search_query])
-        
-        # Set k to be the number of recommendations, bounded between 1 and 20
-        k = max(1, min(20, num_recommendations))
-        distances, indices = index.search(query_embedding, k)
+Only return a JSON object. Do not include explanations or extra text.
 
-        unique_results = set()
+The object must include:
+- num_results (int): number of restaurants requested (default 3)
+- min_rating (float): minimum star rating if specified (default 0)
+- keywords (list of strings): any burrito type or feature (like 'spicy', 'vegetarian')
+- location (string): area or neighborhood if mentioned, otherwise empty string
+
+User query: "{user_input}"
+"""
+
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "Respond only with valid JSON."},
+                        {"role": "user", "content": analysis_prompt}
+                    ]
+                )
+                intent_text = response.choices[0].message.content.strip()
+                intent_text = re.sub(r"^```(json)?|```$", "", intent_text).strip()
+                intent = json.loads(intent_text)
+            except Exception as e:
+                print(f"❌ Error understanding your request: {e}")
+                continue
+
+            num_results = max(1, min(20, intent.get("num_results", 3)))
+            last_min_rating = intent.get("min_rating", 0)
+            last_preferences = intent.get("keywords", [])
+            last_location = intent.get("location", "")
+
+        # Step 2: Construct search description
+        search_desc = "Find burrito places"
+        if last_preferences:
+            search_desc += " that are " + ", ".join(last_preferences)
+        if last_location:
+            search_desc += f" in {last_location}"
+        if last_min_rating:
+            search_desc += f" with rating >= {last_min_rating}"
+
+        query_embedding = sentence_model.encode([search_desc])
+        distances, indices = index.search(query_embedding, len(df))
+
         results = []
+        used_indices = set()
 
-        for i, idx in enumerate(indices[0]):
-            if distances[0][i] < 2.0:
-                restaurant = df.iloc[idx]
-                name = restaurant['name']
-                city = restaurant['city']
-                rating = restaurant['rating']
-                review_count = restaurant['review_count']
-                address = restaurant['address']
-                phone = restaurant['phone']
-                url = restaurant['url']
-                
-                query_prompt = f"Create a friendly message for this burrito restaurant:\nName: {name}\nCity: {city}\nAddress: {address}\nRating: {rating}⭐\nReviews: {review_count} reviews\nPhone: {phone}\nURL: {url}"
-                
-                try:
-                    response = client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=[{
-                            "role": "user",
-                            "content": [{"type": "text", "text": query_prompt}]
-                        }]
-                    )
-                    formatted_response = response.choices[0].message.content.strip()
-                except Exception as e:
-                    formatted_response = "Try this burrito spot, it's awesome!"
+        for idx in indices[0]:
+            if idx in shown_indices or idx in used_indices:
+                continue
 
-                if formatted_response not in unique_results:
-                    unique_results.add(formatted_response)
-                    results.append(formatted_response)
-        
-        if len(results) == 0:
+            restaurant = df.iloc[idx]
+            if restaurant['rating'] < last_min_rating:
+                continue
+
+            if last_preferences:
+                match_text = restaurant['description'].lower()
+                if not all(pref.lower() in match_text for pref in last_preferences):
+                    continue
+
+            name = restaurant['name']
+            city = restaurant['city']
+            rating = restaurant['rating']
+            review_count = restaurant['review_count']
+            address = restaurant['address']
+            phone = restaurant['phone']
+            url = restaurant['url']
+
+            format_prompt = f"""
+Create a friendly message for this burrito restaurant:
+Name: {name}
+City: {city}
+Address: {address}
+Rating: {rating}⭐
+Reviews: {review_count} reviews
+Phone: {phone}
+URL: {url}
+"""
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{
+                        "role": "user",
+                        "content": [{"type": "text", "text": format_prompt}]
+                    }]
+                )
+                formatted_response = response.choices[0].message.content.strip()
+            except Exception as e:
+                formatted_response = f"Check out {name} at {address}!"
+
+            shown_indices.add(idx)
+            used_indices.add(idx)
+            results.append(formatted_response)
+
+            if len(results) >= num_results:
+                break
+
+        if not results:
             print("😕 Sorry, I couldn't find any burrito spots for your request.")
         else:
             for i, result in enumerate(results):
                 print(f"🍽️ {i+1}. {result}\n")
 
-# -------------------------------
-# Run the Chatbot
-# -------------------------------
-
+# run chatbot
 if __name__ == '__main__':
     chatbot()
