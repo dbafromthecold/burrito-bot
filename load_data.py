@@ -1,61 +1,102 @@
-import pandas as pd
-from sentence_transformers import SentenceTransformer
-import faiss
 import os
+import pandas as pd
+import numpy as np
+import faiss
+import time
+from dotenv import load_dotenv
+from azure.identity import DefaultAzureCredential
+import pyodbc
+from openai import AzureOpenAI
 
-# set names for input/output files
-DATA_FILE = 'dublin_burrito_restaurants.csv'
-PROCESSED_CSV = 'processed_burrito_data.csv'
-FAISS_INDEX_FILE = 'burrito_index.faiss'
+# === LOAD ENVIRONMENT VARIABLES ===
+load_dotenv()
 
-# load csv containing yelp data
-if not os.path.exists(DATA_FILE):
-    raise FileNotFoundError(f"Data file '{DATA_FILE}' not found. Please ensure it's in the current directory.")
-df = pd.read_csv(DATA_FILE)
+# === AZURE SQL CONFIGURATION ===
+server = os.getenv("AZURE_SQL_SERVER")
+database = os.getenv("AZURE_SQL_DATABASE")
+table = os.getenv("AZURE_SQL_TABLE")
 
-# confirm all required columns are in the csv
-required_columns = ['name', 'city', 'rating', 'review_count', 'address', 'phone', 'url']
-for col in required_columns:
-    if col not in df.columns:
-        raise ValueError(f"Missing required column: '{col}' in {DATA_FILE}. Please check your data file.")
+# === AZURE OPENAI CONFIGURATION ===
+client = AzureOpenAI(
+    api_key=os.getenv("EMBEDDING_API_KEY"),
+    api_version=os.getenv("EMBEDDING_API_VERSION"),
+    azure_endpoint=os.getenv("EMBEDDING_ENDPOINT"),
+)
+EMBEDDING_DEPLOYMENT_NAME = os.getenv("EMBEDDING_MODEL_NAME")
 
-print(f"✅ Successfully loaded {len(df)} rows from '{DATA_FILE}'")
-print(df.head())
+# === GET ENTRA ID ACCESS TOKEN FOR SQL ===
+credential = DefaultAzureCredential(exclude_interactive_browser_credential=False)
+token = credential.get_token("https://database.windows.net/.default")
+print("Access token retrieved:", token.token[:20], "...")
+access_token = token.token.encode("utf-16-le")
 
-# remove any rows with missing name, city, or address
+# === CONNECT TO AZURE SQL DATABASE ===
+print(f"\n🔌 Connecting to Azure SQL Database '{database}'...")
+connection_string = (
+    f"Driver={{ODBC Driver 17 for SQL Server}};"
+    f"Server={server};"
+    f"Database={database};"
+    f"Authentication=ActiveDirectoryAccessToken;"
+)
+
+try:
+    conn = pyodbc.connect(connection_string, attrs_before={1256: access_token})
+    query = f"SELECT name, city, rating, review_count, address, phone, url FROM {table}"
+    df = pd.read_sql(query, conn)
+    conn.close()
+except Exception as e:
+    raise RuntimeError(f"❌ Failed to load data from Azure SQL: {e}")
+
+print(f"✅ Loaded {len(df)} rows from Azure SQL table '{table}'")
+
+# === CLEAN & PREPARE DATA ===
 df = df.dropna(subset=['name', 'city', 'address'])
 
-# combine the name, city, and address into a single descriptive text
 df['description'] = (
     df['name'] + ' at ' + df['address'] + ' in ' + df['city'] +
     '. Rating: ' + df['rating'].astype(str) + ' stars.' +
     ' Based on ' + df['review_count'].astype(str) + ' reviews.'
 )
 
-# print some cleansed data
 print("\n📋 Sample cleaned descriptions:")
 print(df[['name', 'description']].head())
 
-# load embedding model
-print("\n🔄 Loading embedding model (this may take a minute)...")
-model = SentenceTransformer('all-MiniLM-L6-v2')
+# === EMBEDDING FUNCTION ===
+def get_embedding(text, max_retries=3, delay=1):
+    for attempt in range(max_retries):
+        try:
+            response = client.embeddings.create(
+                input=[text],
+                model=EMBEDDING_DEPLOYMENT_NAME
+            )
+            return response.data[0].embedding
+        except Exception as e:
+            print(f"⚠️ Error generating embedding (attempt {attempt + 1}): {e}")
+            time.sleep(delay)
+    raise RuntimeError(f"Failed to get embedding after {max_retries} attempts.")
 
-# create embeddings for each restaurant description
-print("\n🔄 Generating embeddings for each burrito restaurant...")
-embeddings = model.encode(df['description'].tolist(), show_progress_bar=True)
+# === GENERATE EMBEDDINGS ===
+print("\n🔄 Generating embeddings using Azure OpenAI...")
+embedding_list = []
+for i, desc in enumerate(df['description'].tolist(), 1):
+    print(f"Embedding {i}/{len(df)}...", end='\r')
+    embedding = get_embedding(desc)
+    embedding_list.append(embedding)
 
-# create a FAISS index to store the embeddings for fast retrieval
-d = embeddings.shape[1]  # dimension of the embeddings
-index = faiss.IndexFlatL2(d)  # L2 similarity (distance)
-index.add(embeddings)  # add the embeddings to the FAISS index
+embeddings = np.array(embedding_list).astype("float32")
 
-# save FAISS index
+# === BUILD FAISS INDEX ===
+d = embeddings.shape[1]
+index = faiss.IndexFlatL2(d)
+index.add(embeddings)
+
+# === SAVE OUTPUTS ===
+PROCESSED_CSV = 'processed_burrito_data.csv'
+FAISS_INDEX_FILE = 'burrito_index.faiss'
+
 faiss.write_index(index, FAISS_INDEX_FILE)
-print(f"FAISS index saved as '{FAISS_INDEX_FILE}'")
-
-# save the processed data as a new CSV file
 df.to_csv(PROCESSED_CSV, index=False)
-print(f"Processed data saved as '{PROCESSED_CSV}'")
 
-# Final message
-print("\nData processing complete! The burrito chatbot is ready to use.")
+print(f"\n✅ FAISS index saved as '{FAISS_INDEX_FILE}'")
+print(f"✅ Processed data saved as '{PROCESSED_CSV}'")
+print("\n🎉 Data processing complete! The burrito chatbot is ready to use.")

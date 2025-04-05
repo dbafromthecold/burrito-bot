@@ -1,7 +1,7 @@
 import os
-from openai import AzureOpenAI
 import re
 import json
+import openai
 import faiss
 import pandas as pd
 from sentence_transformers import SentenceTransformer
@@ -17,14 +17,15 @@ FAISS_INDEX_FILE = 'burrito_index.faiss'
 load_dotenv()
 
 # set variables from .env file
-AZURE_API_VERSION = os.getenv('AZURE_API_VERSION')
-AZURE_ENDPOINT = os.getenv('AZURE_ENDPOINT')
-AZURE_API_KEY = os.getenv('AZURE_API_KEY')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+OPENAI_ORG = os.getenv('OPENAI_ORG')
+OPENAI_PROJECT = os.getenv('OPENAI_PROJECT')
 
-client = AzureOpenAI(
-    api_version=AZURE_API_VERSION,
-    azure_endpoint=AZURE_ENDPOINT,
-    api_key=AZURE_API_KEY,
+# initialize the OpenAI client
+client = openai.Client(
+    api_key=OPENAI_API_KEY,
+    organization=OPENAI_ORG,
+    project=OPENAI_PROJECT
 )
 
 # load the processed data
