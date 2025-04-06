@@ -4,7 +4,6 @@ import numpy as np
 import faiss
 import time
 from dotenv import load_dotenv
-from azure.identity import DefaultAzureCredential
 import pyodbc
 from openai import AzureOpenAI
 
@@ -14,7 +13,10 @@ load_dotenv()
 # === AZURE SQL CONFIGURATION ===
 server = os.getenv("AZURE_SQL_SERVER")
 database = os.getenv("AZURE_SQL_DATABASE")
-table = os.getenv("AZURE_SQL_TABLE")
+source_table = os.getenv("AZURE_SQL_SOURCE_TABLE")
+target_table = os.getenv("AZURE_SQL_TARGET_TABLE")
+username = os.getenv("AZURE_SQL_USERNAME")
+password = os.getenv("AZURE_SQL_PASSWORD")
 
 # === AZURE OPENAI CONFIGURATION ===
 client = AzureOpenAI(
@@ -24,30 +26,29 @@ client = AzureOpenAI(
 )
 EMBEDDING_DEPLOYMENT_NAME = os.getenv("EMBEDDING_MODEL_NAME")
 
-# === GET ENTRA ID ACCESS TOKEN FOR SQL ===
-credential = DefaultAzureCredential(exclude_interactive_browser_credential=False)
-token = credential.get_token("https://database.windows.net/.default")
-print("Access token retrieved:", token.token[:20], "...")
-access_token = token.token.encode("utf-16-le")
-
 # === CONNECT TO AZURE SQL DATABASE ===
-print(f"\n🔌 Connecting to Azure SQL Database '{database}'...")
+print(f"\n🔌 Connecting to Azure SQL Database '{database}' using SQL authentication...")
 connection_string = (
     f"Driver={{ODBC Driver 17 for SQL Server}};"
     f"Server={server};"
     f"Database={database};"
-    f"Authentication=ActiveDirectoryAccessToken;"
+    f"UID={username};"
+    f"PWD={password};"
+    f"Encrypt=yes;"
+    f"TrustServerCertificate=no;"
+    f"Connection Timeout=30;"
 )
 
+# === LOAD DATA FROM SOURCE TABLE ===
 try:
-    conn = pyodbc.connect(connection_string, attrs_before={1256: access_token})
-    query = f"SELECT name, city, rating, review_count, address, phone, url FROM {table}"
+    conn = pyodbc.connect(connection_string)
+    query = f"SELECT name, city, rating, review_count, address, phone, url FROM {source_table}"
     df = pd.read_sql(query, conn)
     conn.close()
 except Exception as e:
     raise RuntimeError(f"❌ Failed to load data from Azure SQL: {e}")
 
-print(f"✅ Loaded {len(df)} rows from Azure SQL table '{table}'")
+print(f"✅ Loaded {len(df)} rows from Azure SQL source table '{source_table}'")
 
 # === CLEAN & PREPARE DATA ===
 df = df.dropna(subset=['name', 'city', 'address'])
@@ -85,12 +86,61 @@ for i, desc in enumerate(df['description'].tolist(), 1):
 
 embeddings = np.array(embedding_list).astype("float32")
 
-# === BUILD FAISS INDEX ===
+# === TRUNCATE + BATCH INSERT INTO TARGET TABLE ===
+print(f"\n📝 Replacing data in Azure SQL target table '{target_table}'...")
+
+try:
+    conn = pyodbc.connect(connection_string)
+    cursor = conn.cursor()
+
+    # Clear target table
+    cursor.execute(f"TRUNCATE TABLE {target_table}")
+    conn.commit()
+
+    # Prepare all rows as list of tuples
+    rows_to_insert = [
+        (
+            row['name'],
+            row['city'],
+            float(row['rating']),
+            int(row['review_count']),
+            row['address'],
+            row['phone'],
+            row['url'],
+            row['description'],
+            list(map(float, embedding_list[i]))
+        )
+        for i, row in df.iterrows()
+    ]
+
+    if not rows_to_insert:
+        print("⚠️ No rows to insert. Exiting.")
+        conn.close()
+        exit()
+
+    # Batch insert
+    cursor.executemany(
+        f"""
+        INSERT INTO {target_table} (name, city, rating, review_count, address, phone, url, description, embedding)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        rows_to_insert
+    )
+
+    conn.commit()
+    cursor.execute(f"SELECT COUNT(*) FROM {target_table}")
+    print(f"✅ Insert complete! Total rows in '{target_table}': {cursor.fetchone()[0]}")
+    conn.close()
+except Exception as e:
+    raise RuntimeError(f"❌ Failed to insert embeddings into Azure SQL: {e}")
+
+# === OPTIONAL: LOCAL FAISS EXPORT ===
+print("\n📦 Saving FAISS index and processed data locally...")
+
 d = embeddings.shape[1]
 index = faiss.IndexFlatL2(d)
 index.add(embeddings)
 
-# === SAVE OUTPUTS ===
 PROCESSED_CSV = 'processed_burrito_data.csv'
 FAISS_INDEX_FILE = 'burrito_index.faiss'
 
@@ -99,4 +149,5 @@ df.to_csv(PROCESSED_CSV, index=False)
 
 print(f"\n✅ FAISS index saved as '{FAISS_INDEX_FILE}'")
 print(f"✅ Processed data saved as '{PROCESSED_CSV}'")
-print("\n🎉 Data processing complete! The burrito chatbot is ready to use.")
+print("\n🎉 Embedding pipeline complete! Vector-enriched data is now live in Azure SQL.")
+
