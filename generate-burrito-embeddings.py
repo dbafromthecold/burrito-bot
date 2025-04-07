@@ -6,9 +6,10 @@ from azure.keyvault.secrets import SecretClient
 import os
 
 def main(mytimer: func.TimerRequest) -> None:
-    logging.info('🔄 Running Azure Function to trigger embedding generation')
+    
+    logging.info(f'Running Azure Function to trigger embedding generation')
 
-    # === GET SECRETS FROM KEY VAULT ===
+    # fetching secrets from Azure Key Vault
     credential = DefaultAzureCredential()
     client = SecretClient(vault_url=kv_url, credential=credential)
 
@@ -19,7 +20,7 @@ def main(mytimer: func.TimerRequest) -> None:
     sql_user   = client.get_secret("azure-sql-username").value
     sql_pass   = client.get_secret("azure-sql-password").value
 
-    # === CONNECT TO SQL ===
+    # connecting to Azure SQL Database
     conn_str = (
         f"Driver={{ODBC Driver 18 for SQL Server}};"
         f"Server={sql_server};"
@@ -33,12 +34,18 @@ def main(mytimer: func.TimerRequest) -> None:
     try:
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
-        logging.info(f"📡 Calling stored procedure: {sql_proc}")
+    
+        logging.info(f"Calling stored procedure: {sql_proc}")
+    
         cursor.execute(f"EXEC {sql_proc}")
         conn.commit()
-        logging.info("✅ Embedding generation complete.")
+    
+        logging.info(f"Embedding generation complete.")
+    
     except Exception as e:
-        logging.error(f"❌ Failed to call stored procedure: {e}")
+    
+        logging.error(f"Failed to call stored procedure: {e}")
+    
     finally:
         if conn:
             conn.close()
