@@ -9,11 +9,13 @@ def main(mytimer: func.TimerRequest) -> None:
     
     logging.info(f'Running Azure Function to trigger embedding generation')
 
+    kv_url = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
     # fetching secrets from Azure Key Vault
     credential = DefaultAzureCredential()
     client = SecretClient(vault_url=kv_url, credential=credential)
 
-    kv_url     = client.get_secret("AZURE-KEY-VAULT-URL").value
+    
     sql_server = client.get_secret("AZURE-SQL-SERVER").value
     sql_proc   = client.get_secret("AZURE-SQL-EMBEDDING-PROC").value
     sql_db     = client.get_secret("AZURE-SQL-DATABASE").value
