@@ -167,3 +167,6 @@ azure_login
 # misc files
 install_dependencies.txt
 create_azure_vault_keys.sh
+
+
+models/
