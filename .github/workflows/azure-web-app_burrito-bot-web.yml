@@ -59,4 +59,4 @@ jobs:
           app-name: 'burrito-bot-web'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C29C86E3E4FB4CBD8540EA67D2426FCD }}
-          package: .
+          package: ./python-app
