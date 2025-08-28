@@ -30,7 +30,7 @@ def chat(payload: dict):
     conn = pyodbc.connect("Driver={ODBC Driver 18 for SQL Server};" + cs + ";Connection Timeout=30;")
     try:
         with conn.cursor() as cur:
-            cur.execute("{CALL dbo.usp_SemanticSearchRestaurants(?,?)}", (q, 5))
+            cur.execute("{CALL dbo.search_restaurants(?,?)}", (q, 5))
             cols = [c[0].lower() for c in cur.description]
             rows = [dict(zip(cols, r)) for r in cur.fetchall()]
     finally:
