@@ -2,10 +2,20 @@ import os, pyodbc
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-# --- SQL connection string from Portal Connection strings ---
+# look for the connection string in all possible slots
+cs = (
+    os.getenv("SQLAZURECONNSTR_DefaultConnection")
+    or os.getenv("SQLCONNSTR_DefaultConnection")
+    or os.getenv("CUSTOMCONNSTR_DefaultConnection")
+    or os.getenv("DefaultConnection")  # fallback if you move it to App Settings instead
+)
+
+if not cs:
+    raise RuntimeError("No SQL connection string found in environment")
+
 conn = pyodbc.connect(
     "Driver={ODBC Driver 18 for SQL Server};"
-    + os.environ["DefaultConnection"]   # provided by App Service
+    + cs
     + ";Connection Timeout=30;"
 )
 
