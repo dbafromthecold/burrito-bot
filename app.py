@@ -1,10 +1,13 @@
 # app.py
 import os
 import pyodbc
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, HTMLResponse
+from pathlib import Path
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 
 app = FastAPI()
+
+BASE_DIR = Path(__file__).resolve().parent  # folder where app.py lives
 
 # ---------- DB connection ----------
 def get_conn():
@@ -37,107 +40,13 @@ def call_search(conn, query: str, top_k: int = 5):
 def health():
     return {"status": "ok"}
 
+
 # ---------- Minimal web UI at "/" ----------
 @app.get("/", response_class=HTMLResponse)
 def index():
-    return """
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Burrito Bot</title>
-  <style>
-    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    body { margin: 0; padding: 2rem; background:#0b0c10; color:#f5f7fa; }
-    .wrap { max-width: 820px; margin: 0 auto; }
-    h1 { margin: 0 0 1rem; font-size: 1.8rem; }
-    form, .card { background: #141821; border: 1px solid #242a36; border-radius: 14px; padding: 1rem; }
-    label { display:block; font-size:.9rem; color:#cbd5e1; margin-bottom:.25rem; }
-    input[type="text"]{ width:100%; padding:.75rem .9rem; border:1px solid #2b3344; border-radius:10px; background:#0f131b; color:#e5e7eb; }
-    .row { display:flex; gap:.75rem; margin-top:.75rem; align-items:center; }
-    .row input[type="number"]{ width:100px; padding:.55rem .6rem; border:1px solid #2b3344; border-radius:10px; background:#0f131b; color:#e5e7eb; }
-    button { padding:.7rem 1rem; border:0; border-radius:10px; background:#3b82f6; color:white; cursor:pointer; }
-    button:disabled{ opacity:.6; cursor:not-allowed; }
-    .results { margin-top:1rem; display:grid; gap:.75rem; }
-    .item { background:#0f131b; border:1px solid #222838; border-radius:12px; padding:.75rem .9rem; }
-    .kvs { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin-top:.35rem; font-size:.9rem; color:#cbd5e1; }
-    .kv b { color:#e5e7eb; }
-    .muted { color:#9aa4b2; font-size:.9rem; }
-    .err { color:#fca5a5; white-space:pre-wrap; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <h1>🌯 Burrito Bot</h1>
-    <form id="f">
-      <label for="q">Ask a question</label>
-      <input id="q" name="q" type="text" placeholder="What's the best burrito in Dublin" required />
-      <div class="row">
-        <label for="k" class="muted">Number of results</label>
-        <input id="k" name="k" type="number" min="1" max="50" value="5" />
-        <button id="go" type="submit">Search</button>
-      </div>
-    </form>
+    """Serve the ui.html file instead of embedding HTML inline."""
+    return FileResponse(BASE_DIR / "ui.html")
 
-    <div id="out" class="results"></div>
-  </div>
-
-  <script>
-    const f = document.getElementById('f');
-    const out = document.getElementById('out');
-    const btn = document.getElementById('go');
-
-    function render(items, answer) {
-      out.innerHTML = '';
-      if (answer) {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = '<div class="muted">Answer</div><div style="margin-top:.35rem; white-space:pre-wrap;">' + answer.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>';
-        out.appendChild(card);
-      }
-      if (!items || !items.length) return;
-      for (const r of items) {
-        const div = document.createElement('div');
-        div.className = 'item';
-        const lines = [];
-        if (r.name) lines.push('<b>' + r.name + '</b>');
-        if (r.city) lines.push('<span class="muted">in ' + r.city + '</span>');
-        const head = lines.join(' ');
-        const kvs = Object.entries(r).map(([k,v]) => '<span class="kv"><b>'+k+':</b> '+String(v)+'</span>').join('');
-        div.innerHTML = (head ? head + '<br/>' : '') + '<div class="kvs">'+kvs+'</div>';
-        out.appendChild(div);
-      }
-    }
-
-    f.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      btn.disabled = true;
-      out.innerHTML = '<div class="muted">Searching…</div>';
-      const q = document.getElementById('q').value.trim();
-      const k = parseInt(document.getElementById('k').value || '5', 10);
-      try {
-        const res = await fetch('/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: q, top_k: k })
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          out.innerHTML = '<div class="err">'+ (data.error || JSON.stringify(data)) +'</div>';
-        } else {
-          render(data.citations || [], data.answer || '');
-        }
-      } catch (err) {
-        out.innerHTML = '<div class="err">'+ String(err) +'</div>';
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  </script>
-</body>
-</html>
-    """
 
 # ---------- JSON API ----------
 @app.post("/chat")
@@ -159,7 +68,7 @@ def chat(payload: dict):
     if not rows:
         return {"answer": "No matches found.", "citations": []}
 
-    # Adjust field names if your proc/TVF returns different columns
+    # Adjust field names if your proc returns different columns
     lines = []
     for r in rows:
         name = r.get("name") or r.get("restaurant") or r.get("title") or "(no name)"

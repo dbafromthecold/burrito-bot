@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Burrito Bot UI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: .75rem; align-items: end; max-width: 700px; }
+    label { display: block; font-size: .9rem; color: #555; margin-bottom: .25rem; }
+    input, button { padding: .6rem .8rem; font-size: 1rem; }
+    input { width: 100%; border: 1px solid #ddd; border-radius: 8px; }
+    button { border: 0; border-radius: 8px; cursor: pointer; }
+    button.primary { background: #0ea5e9; color: white; }
+    #results { margin-top: 1.5rem; display: grid; gap: .75rem; }
+    .card { border: 1px solid #eee; border-radius: 12px; padding: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+    .title { font-weight: 600; margin: 0 0 .25rem; }
+    .meta { color: #666; font-size: .95rem; }
+    .error { color: #b00020; white-space: pre-wrap; }
+    .muted { color: #777; }
+  </style>
+</head>
+<body>
+  <h1>🌯 Burrito Bot</h1>
+  <p class="muted">Search restaurants via your API.</p>
+
+  <div class="row">
+    <div>
+      <label for="query">Query</label>
+      <input id="query" placeholder="e.g. Dublin, spicy, barbacoa..." />
+    </div>
+    <div style="width:120px">
+      <label for="topk">Top K</label>
+      <input id="topk" type="number" min="1" max="50" value="5" />
+    </div>
+    <div>
+      <button id="go" class="primary">Search</button>
+    </div>
+  </div>
+
+  <div id="status" class="muted" style="margin-top:.75rem;"></div>
+  <div id="results"></div>
+
+  <script>
+    // Point this at your deployed API base URL if the UI is hosted separately.
+    // For same-origin (served by FastAPI), leave as "".
+    const API_BASE = ""; // e.g. "https://burrito-bot-web-....azurewebsites.net"
+
+    const $ = (id) => document.getElementById(id);
+    const statusEl = $("status");
+    const resultsEl = $("results");
+
+    $("go").addEventListener("click", async () => {
+      const query = $("query").value.trim();
+      const topk = parseInt($("topk").value, 10) || 5;
+
+      resultsEl.innerHTML = "";
+      statusEl.textContent = "Searching…";
+
+      try {
+        const res = await fetch(`${API_BASE}/exec/dbo.search_restaurants`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, top_k: topk })
+        });
+
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) {
+          const detail = (payload && payload.detail) ? JSON.stringify(payload.detail, null, 2) : JSON.stringify(payload, null, 2);
+          statusEl.innerHTML = `<span class="error">API error:\n${detail}</span>`;
+          return;
+        }
+
+        const rows = payload.rows || [];
+        statusEl.textContent = `Found ${rows.length} result(s).`;
+
+        if (rows.length === 0) {
+          resultsEl.innerHTML = `<div class="muted">No results.</div>`;
+          return;
+        }
+
+        // Render cards
+        for (const r of rows) {
+          const rating = typeof r.rating === "number" ? r.rating.toFixed(1) : r.rating;
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <div class="title">${escapeHtml(r.name ?? "(no name)")}</div>
+            <div class="meta">
+              <div><strong>City:</strong> ${escapeHtml(r.city ?? "")}</div>
+              <div><strong>Rating:</strong> ${rating ?? ""} &nbsp; • &nbsp; <strong>Reviews:</strong> ${r.review_count ?? ""}</div>
+              ${r.address ? `<div><strong>Address:</strong> ${escapeHtml(r.address)}</div>` : ""}
+              ${r.phone ? `<div><strong>Phone:</strong> ${escapeHtml(r.phone)}</div>` : ""}
+              ${r.url ? `<div><a href="${escapeAttr(r.url)}" target="_blank" rel="noopener">View on web ↗</a></div>` : ""}
+              ${r.id != null ? `<div class="muted">id: ${r.id}</div>` : ""}
+            </div>
+          `;
+          resultsEl.appendChild(card);
+        }
+      } catch (err) {
+        statusEl.innerHTML = `<span class="error">${String(err)}</span>`;
+      }
+    });
+
+    // Simple escaping helpers
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (m) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));
+    }
+    function escapeAttr(s) {
+      return escapeHtml(s).replace(/"/g, "&quot;");
+    }
+  </script>
+</body>
+</html>
