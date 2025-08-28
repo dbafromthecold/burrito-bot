@@ -72,9 +72,9 @@ def index():
     <h1>🌯 Burrito Bot</h1>
     <form id="f">
       <label for="q">Ask a question</label>
-      <input id="q" name="q" type="text" placeholder="best burrito in Galway" required />
+      <input id="q" name="q" type="text" placeholder="What's the best burrito in Dublin" required />
       <div class="row">
-        <label for="k" class="muted">Top K</label>
+        <label for="k" class="muted">Number of results</label>
         <input id="k" name="k" type="number" min="1" max="50" value="5" />
         <button id="go" type="submit">Search</button>
       </div>
