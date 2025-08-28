@@ -21,25 +21,16 @@ def get_conn():
 
 def call_search(conn, query: str, top_k: int = 5):
     """
-    Try as stored procedure first, then as TVF if needed.
+    Call the dbo.search_restaurants stored procedure.
     Returns list[dict].
     """
-    rows = []
     with conn.cursor() as cur:
-        try:
-            cur.execute("EXEC dbo.search_restaurants ?, ?", (query, top_k))
-            cols = [c[0] for c in cur.description] if cur.description else []
-            if cols:
-                rows = [dict(zip(cols, r)) for r in cur.fetchall()]
-            return rows
-        except pyodbc.ProgrammingError as ex:
-            # If it's actually a table-valued function, fall back to SELECT
-            msg = str(ex)
-            if "Incorrect syntax near the keyword 'TABLE'" in msg or "is not a procedure" in msg:
-                cur.execute("SELECT * FROM dbo.search_restaurants(?, ?)", (query, top_k))
-                cols = [c[0] for c in cur.description]
-                return [dict(zip(cols, r)) for r in cur.fetchall()]
-            raise
+        cur.execute("EXEC dbo.search_restaurants ?, ?", (query, top_k))
+        cols = [c[0] for c in cur.description] if cur.description else []
+        if not cols:
+            return []
+        return [dict(zip(cols, row)) for row in cur.fetchall()]
+
 
 # ---------- Health ----------
 @app.get("/health")
