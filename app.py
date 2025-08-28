@@ -71,7 +71,7 @@ def chat(payload: dict):
     # Adjust field names if your proc returns different columns
     lines = []
     for r in rows:
-        name = r.get("name") or r.get("restaurant") or r.get("title") or "(no name)"
+        name = r.get("Name") or r.get("restaurant") or r.get("title") or "(no name)"
         city = r.get("city") or r.get("location") or ""
         lines.append(f"- {name}" + (f" in {city}" if city else ""))
     answer = "Top results:\n" + "\n".join(lines)
