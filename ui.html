@@ -36,21 +36,34 @@
     }
 
     .row {
-      display:flex;
-      gap:.75rem;
-      margin-top:.75rem;
-      align-items:center;
-      flex-wrap: wrap; /* keeps things tidy on smaller screens */
+      display: flex;
+      flex-wrap: wrap;        /* allows wrapping on small screens */
+      gap: .75rem;
+      margin-top: .75rem;
+      align-items: center;
     }
-    .row label { margin: 0; } /* override the global label margin for row */
-    .row input[type="number"]{
-      width:100px;
-      padding:.55rem .6rem;
-      border:1px solid #2b3344;
-      border-radius:10px;
-      background:#0f131b;
-      color:#e5e7eb;
+
+    .row label {
+      margin: 0; /* override the global label margin for row */
     }
+
+    .row input[type="number"] {
+      width: 100px;
+      padding: .55rem .6rem;
+      border: 1px solid #2b3344;
+      border-radius: 10px;
+      background: #0f131b;
+      color: #e5e7eb;
+    }
+
+    .row button {
+      flex-shrink: 0;         /* don’t let button squeeze smaller */
+      height: 40px;           /* matches number input height */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     button { padding:.7rem 1rem; border:0; border-radius:10px; background:#3b82f6; color:white; cursor:pointer; }
     button:disabled{ opacity:.6; cursor:not-allowed; }
 
