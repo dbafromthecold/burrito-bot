@@ -8,7 +8,7 @@
     :root {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       /* Shared width for the top input and the row below */
-      --field-max: 560px; /* tweak this number if you want it narrower/wider */
+      --field-max: 560px;
     }
     * { box-sizing: border-box; }
 
@@ -19,11 +19,10 @@
     label { display:block; font-size:.9rem; color:#cbd5e1; margin-bottom:.25rem; }
 
     /* PIXEL-PERFECT ALIGNMENT */
-    /* Make the text input and the row have the exact same width */
     form > input[type="text"],
     form > .row {
-      width: 100%;          /* fill the form */
-      max-width: none;      /* no artificial cap */
+      width: 100%;
+      max-width: none;
     }
 
     input[type="text"] {
@@ -32,33 +31,30 @@
       border-radius: 10px;
       background: #0f131b;
       color: #e5e7eb;
-      box-sizing: border-box; /* ensures padding stays inside width */
     }
 
     .row {
       display: flex;
-      flex-wrap: wrap;        /* allows wrapping on small screens */
+      flex-wrap: wrap;
       gap: .75rem;
       margin-top: .75rem;
       align-items: center;
     }
 
-    .row label {
-      margin: 0; /* override the global label margin for row */
-    }
+    .row label { margin: 0; }
 
     .row input[type="number"] {
       width: 100px;
       padding: .55rem .6rem;
       border: 1px solid #2b3344;
       border-radius: 10px;
-      background: #0f131b;
-      color: #e5e7eb;
+      background:#0f131b;
+      color:#e5e7eb;
     }
 
     .row button {
-      flex-shrink: 0;         /* don’t let button squeeze smaller */
-      height: 40px;           /* matches number input height */
+      flex-shrink: 0;
+      height: 40px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -71,6 +67,8 @@
     .item { background:#0f131b; border:1px solid #222838; border-radius:12px; padding:.75rem .9rem; }
     .kvs { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin-top:.35rem; font-size:.9rem; color:#cbd5e1; }
     .kv b { color:#e5e7eb; }
+    .kvs a { color:#3b82f6; text-decoration: underline; }
+    .kvs a:hover { color:#60a5fa; }
     .muted { color:#9aa4b2; font-size:.9rem; }
     .err { color:#fca5a5; white-space:pre-wrap; }
   </style>
@@ -96,6 +94,20 @@
     const out = document.getElementById('out');
     const btn = document.getElementById('go');
 
+    // Escape helper for href attributes
+    function escapeAttr(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
     function render(items, answer) {
       out.innerHTML = '';
       if (answer) {
@@ -109,15 +121,16 @@
         const div = document.createElement('div');
         div.className = 'item';
         const lines = [];
-        if (r.name) lines.push('<b>' + r.name + '</b>');
-        if (r.city) lines.push('<span class="muted">in ' + r.city + '</span>');
+        if (r.name) lines.push('<b>' + escapeHtml(r.name) + '</b>');
+        if (r.city) lines.push('<span class="muted">in ' + escapeHtml(r.city) + '</span>');
         const head = lines.join(' ');
         const kvs = Object.entries(r).map(([k,v]) => {
-            if (k === "url") {
-              return '<span class="kv"><b>'+k+':</b> <a href="'+v+'" target="_blank" rel="noopener">'+v+'</a></span>';
-            }
-            return '<span class="kv"><b>'+k+':</b> '+String(v)+'</span>';
-          }).join('');
+          if (k.toLowerCase() === "url" && v) {
+            const safeUrl = escapeAttr(v);
+            return '<span class="kv"><b>'+escapeHtml(k)+':</b> <a href="'+safeUrl+'" target="_blank" rel="noopener">'+escapeHtml(v)+'</a></span>';
+          }
+          return '<span class="kv"><b>'+escapeHtml(k)+':</b> '+escapeHtml(v)+'</span>';
+        }).join('');
         div.innerHTML = (head ? head + '<br/>' : '') + '<div class="kvs">'+kvs+'</div>';
         out.appendChild(div);
       }
