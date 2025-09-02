@@ -125,7 +125,7 @@
         if (r.city) lines.push('<span class="muted">in ' + escapeHtml(r.city) + '</span>');
         const head = lines.join(' ');
         const kvs = Object.entries(r).map(([k,v]) => {
-          if (k.toLowerCase() === "url" && v) {
+          if (k.toLowerCase() === "URL" && v) {
             const safeUrl = escapeAttr(v);
             return '<span class="kv"><b>'+escapeHtml(k)+':</b> <a href="'+safeUrl+'" target="_blank" rel="noopener">'+escapeHtml(v)+'</a></span>';
           }
