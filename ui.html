@@ -112,7 +112,12 @@
         if (r.name) lines.push('<b>' + r.name + '</b>');
         if (r.city) lines.push('<span class="muted">in ' + r.city + '</span>');
         const head = lines.join(' ');
-        const kvs = Object.entries(r).map(([k,v]) => '<span class="kv"><b>'+k+':</b> '+String(v)+'</span>').join('');
+        const kvs = Object.entries(r).map(([k,v]) => {
+            if (k === "url") {
+              return '<span class="kv"><b>'+k+':</b> <a href="'+v+'" target="_blank" rel="noopener">'+v+'</a></span>';
+            }
+            return '<span class="kv"><b>'+k+':</b> '+String(v)+'</span>';
+          }).join('');
         div.innerHTML = (head ? head + '<br/>' : '') + '<div class="kvs">'+kvs+'</div>';
         out.appendChild(div);
       }
