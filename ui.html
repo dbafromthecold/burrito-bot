@@ -22,16 +22,17 @@
     /* Make the text input and the row have the exact same width */
     form > input[type="text"],
     form > .row {
-      width: 100%;
-      max-width: var(--field-max);
+      width: 100%;          /* fill the form */
+      max-width: none;      /* no artificial cap */
     }
 
-    input[type="text"]{
-      padding:.75rem .9rem;
-      border:1px solid #2b3344;
-      border-radius:10px;
-      background:#0f131b;
-      color:#e5e7eb;
+    input[type="text"] {
+      padding: .75rem .9rem;
+      border: 1px solid #2b3344;
+      border-radius: 10px;
+      background: #0f131b;
+      color: #e5e7eb;
+      box-sizing: border-box; /* ensures padding stays inside width */
     }
 
     .row {
