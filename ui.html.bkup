@@ -5,54 +5,17 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>🌯 Burrito Bot</title>
   <style>
-    :root {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      /* Shared width for the top input and the row below */
-      --field-max: 560px; /* tweak this number if you want it narrower/wider */
-    }
-    * { box-sizing: border-box; }
-
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
     body { margin: 0; padding: 2rem; background:#0b0c10; color:#f5f7fa; }
     .wrap { max-width: 820px; margin: 0 auto; }
     h1 { margin: 0 0 1rem; font-size: 1.8rem; }
     form, .card { background: #141821; border: 1px solid #242a36; border-radius: 14px; padding: 1rem; }
     label { display:block; font-size:.9rem; color:#cbd5e1; margin-bottom:.25rem; }
-
-    /* PIXEL-PERFECT ALIGNMENT */
-    /* Make the text input and the row have the exact same width */
-    form > input[type="text"],
-    form > .row {
-      width: 100%;
-      max-width: var(--field-max);
-    }
-
-    input[type="text"]{
-      padding:.75rem .9rem;
-      border:1px solid #2b3344;
-      border-radius:10px;
-      background:#0f131b;
-      color:#e5e7eb;
-    }
-
-    .row {
-      display:flex;
-      gap:.75rem;
-      margin-top:.75rem;
-      align-items:center;
-      flex-wrap: wrap; /* keeps things tidy on smaller screens */
-    }
-    .row label { margin: 0; } /* override the global label margin for row */
-    .row input[type="number"]{
-      width:100px;
-      padding:.55rem .6rem;
-      border:1px solid #2b3344;
-      border-radius:10px;
-      background:#0f131b;
-      color:#e5e7eb;
-    }
+    input[type="text"]{ width:100%; padding:.75rem .9rem; border:1px solid #2b3344; border-radius:10px; background:#0f131b; color:#e5e7eb; }
+    .row { display:flex; gap:.75rem; margin-top:.75rem; align-items:center; }
+    .row input[type="number"]{ width:100px; padding:.55rem .6rem; border:1px solid #2b3344; border-radius:10px; background:#0f131b; color:#e5e7eb; }
     button { padding:.7rem 1rem; border:0; border-radius:10px; background:#3b82f6; color:white; cursor:pointer; }
     button:disabled{ opacity:.6; cursor:not-allowed; }
-
     .results { margin-top:1rem; display:grid; gap:.75rem; }
     .item { background:#0f131b; border:1px solid #222838; border-radius:12px; padding:.75rem .9rem; }
     .kvs { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin-top:.35rem; font-size:.9rem; color:#cbd5e1; }
