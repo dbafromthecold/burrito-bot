@@ -7,9 +7,11 @@ $overpassUrl = "https://overpass-api.de/api/interpreter"
 # - Find the administrative area named "Dublin"
 # - Return amenities tagged as restaurant where cuisine contains "mexican" (case-insensitive)
 # - Include nodes/ways/relations and output center points for ways/relations
+#area["name"="Cork"]["boundary"="administrative"]->.searchArea;
+
 $query = @'
 [out:json][timeout:60];
-area["name"="Dublin"]["boundary"="administrative"]->.searchArea;
+area["name"="Ireland"]["boundary"="administrative"]["admin_level"="2"]->.searchArea;
 (
   node["amenity"="restaurant"]["cuisine"~"mexican",i](area.searchArea);
   way["amenity"="restaurant"]["cuisine"~"mexican",i](area.searchArea);
