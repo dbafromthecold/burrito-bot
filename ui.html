@@ -72,7 +72,8 @@
     .results { margin-top:1rem; display:grid; gap:.75rem; }
     .item { background:#0f131b; border:1px solid #222838; border-radius:12px; padding:.75rem .9rem; }
     .kvs { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin-top:.35rem; font-size:.9rem; color:#cbd5e1; }
-    .kv { flex-basis: 100%; }
+    .kv { flex-basis: auto; }
+    .kv-block { flex-basis: 100%; }
     .kv b { color:#e5e7eb; }
     .muted { color:#9aa4b2; font-size:.9rem; }
     .err { color:#fca5a5; white-space:pre-wrap; }
@@ -115,22 +116,25 @@
         if (r.name) lines.push('<b>' + r.name + '</b>');
         if (r.city) lines.push('<span class="muted">in ' + r.city + '</span>');
         const head = lines.join(' ');
-        const kvs = Object.entries(r).map(([k,v]) => {
-          if (k === "Address" || k === "Phone Number") {
-            return `<div class="kv">
-              <b>${k}:</b><br/>
-              <span class="muted">${v}</span>
-            </div>`;
-          }
+        const kvs = Object.entries(r).map(([k, v]) => {
+        const key = String(k).toLowerCase();
 
-          if (k === "URL") {
-            return `<span class="kv">
-              <b>${k}:</b>
-              <a href="${v}" target="_blank" rel="noopener">${v}</a>
-            </span>`;
-          }
-          return `<span class="kv"><b>${k}:</b> ${v}</span>`;
-        }).join('');
+        if (key === "address" || key === "phone") {
+          return `<div class="kv kv-block">
+            <b>${k}:</b> <span class="muted">${String(v)}</span>
+          </div>`;
+        }
+
+        if (key === "url") {
+          const href = String(v);
+          return `<span class="kv">
+            <b>${k}:</b>
+            <a href="${href}" target="_blank" rel="noopener">${href}</a>
+          </span>`;
+        }
+
+        return `<span class="kv"><b>${k}:</b> ${String(v)}</span>`;
+      }).join('');
 
         div.innerHTML = (head ? head + '<br/>' : '') + '<div class="kvs">'+kvs+'</div>';
         out.appendChild(div);
