@@ -115,11 +115,23 @@
         if (r.city) lines.push('<span class="muted">in ' + r.city + '</span>');
         const head = lines.join(' ');
         const kvs = Object.entries(r).map(([k,v]) => {
-            if (k === "URL") {
-              return '<span class="kv"><b>'+k+':</b> <a href="'+String(v)+'" target="_blank" rel="noopener">'+String(v)+'</a></span>';
-            }
-            return '<span class="kv"><b>'+k+':</b> '+String(v)+'</span>';
-          }).join('');
+
+          if (k === "URL") {
+            return `<div class="kv">
+                      <b>${k}:</b>
+                      <a href="${v}" target="_blank" rel="noopener">${v}</a>
+                    </div>`;
+          }
+
+          if (k === "address" || k === "phone") {
+            return `<div class="kv">
+                      <b>${k}:</b><br/>
+                      <span class="muted">${v}</span>
+                    </div>`;
+          }
+
+          return `<span class="kv"><b>${k}:</b> ${v}</span>`;
+        }).join('');
         div.innerHTML = (head ? head + '<br/>' : '') + '<div class="kvs">'+kvs+'</div>';
         out.appendChild(div);
       }
