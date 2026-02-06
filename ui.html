@@ -72,7 +72,7 @@
     .results { margin-top:1rem; display:grid; gap:.75rem; }
     .item { background:#0f131b; border:1px solid #222838; border-radius:12px; padding:.75rem .9rem; }
     .kvs { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin-top:.35rem; font-size:.9rem; color:#cbd5e1; }
-    .kv { display: block; }
+    .kv { flex-basis: 100%; }
     .kv b { color:#e5e7eb; }
     .muted { color:#9aa4b2; font-size:.9rem; }
     .err { color:#fca5a5; white-space:pre-wrap; }
@@ -116,23 +116,22 @@
         if (r.city) lines.push('<span class="muted">in ' + r.city + '</span>');
         const head = lines.join(' ');
         const kvs = Object.entries(r).map(([k,v]) => {
-
-          if (k === "URL") {
-            return `<div class="kv">
-                      <b>${k}:</b>
-                      <a href="${v}" target="_blank" rel="noopener">${v}</a>
-                    </div>`;
-          }
-
           if (k === "address" || k === "phone") {
             return `<div class="kv">
-                      <b>${k}:</b><br/>
-                      <span class="muted">${v}</span>
-                    </div>`;
+              <b>${k}:</b><br/>
+              <span class="muted">${v}</span>
+            </div>`;
           }
 
+          if (k === "URL") {
+            return `<span class="kv">
+              <b>${k}:</b>
+              <a href="${v}" target="_blank" rel="noopener">${v}</a>
+            </span>`;
+          }
           return `<span class="kv"><b>${k}:</b> ${v}</span>`;
         }).join('');
+        
         div.innerHTML = (head ? head + '<br/>' : '') + '<div class="kvs">'+kvs+'</div>';
         out.appendChild(div);
       }
