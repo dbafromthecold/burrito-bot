@@ -48,6 +48,19 @@ def index():
     return FileResponse(BASE_DIR / "ui.html")
 
 
+# ---------- Removing NULLs ----------
+def remove_null_fields(row: dict) -> dict:
+    cleaned = {}
+    for k, v in row.items():
+        if v is None:
+            continue
+        if isinstance(v, str) and not v.strip():
+            continue
+        if isinstance(v, str) and v.upper() == "N/A":
+            continue
+        cleaned[k] = v
+    return cleaned
+
 # ---------- JSON API ----------
 @app.post("/chat")
 def chat(payload: dict):
@@ -58,7 +71,8 @@ def chat(payload: dict):
 
     try:
         with get_conn() as conn:
-            rows = call_search(conn, q, top_k)
+           # rows = call_search(conn, q, top_k)
+            rows = [remove_null_fields(r) for r in call_search(conn, q, top_k)]
     except Exception as ex:
         return JSONResponse(
             status_code=500,
