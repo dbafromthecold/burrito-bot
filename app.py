@@ -12,12 +12,12 @@ BASE_DIR = Path(__file__).resolve().parent  # folder where app.py lives
 
 # ---------- Azure OpenAI Client ----------
 aoai_client = AzureOpenAI(
-    api_key=os.environ.get("AZURE_OPEN_API_KEY"),
-    api_version=os.environ.get("AZURE_OPENAI_API_VERSION"),
-    azure_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT")
+    api_key=os.environ["AZURE_OPENAI_KEY"],
+    api_version=os.environ["AZURE_OPENAI_API_VERSION"],
+    azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"]
 )
 
-aoai_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT")
+aoai_deployment = os.environ["AZURE_OPENAI_DEPLOYMENT"]
 
 
 # ---------- DB connection ----------
