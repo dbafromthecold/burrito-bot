@@ -125,8 +125,7 @@ function render(items, answer) {
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML =
-      '<div class="muted">AI Answer (grounded in your data)</div>' +
-      '<div style="margin-top:.35rem; white-space:pre-wrap;">' +
+      '<div style="white-space:pre-wrap;">' +
       escapeHtml(answer) +
       '</div>';
     out.appendChild(card);
@@ -134,11 +133,6 @@ function render(items, answer) {
 
   if (!items || !items.length) return;
 
-  // ---------- Sources Heading ----------
-  const src = document.createElement('div');
-  src.className = 'muted';
-  src.textContent = 'Sources used to generate this answer:';
-  out.appendChild(src);
 
   // ---------- Render Retrieved Rows ----------
   for (const r of items) {
@@ -166,10 +160,13 @@ function render(items, answer) {
         }
 
         if (key === "url") {
+          const href = String(v);
           return `<div class="kv-block"><b>${k}:</b>
-            <a href="${v}" target="_blank">Visit Website</a></div>`;
+            <a href="${href}" target="_blank" rel="noopener">
+              ${escapeHtml(href)}
+            </a>
+          </div>`;
         }
-
         return `<span><b>${k}:</b> ${escapeHtml(String(v))}</span>`;
       }).join('');
 
