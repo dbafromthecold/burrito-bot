@@ -7,17 +7,30 @@ from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from openai import AzureOpenAI
 
 app = FastAPI()
-BASE_DIR = Path(__file__).resolve().parent  # folder where app.py lives
+BASE_DIR = Path(__file__).resolve().parent
 
 
-# ---------- Azure OpenAI Client ----------
-aoai_client = AzureOpenAI(
-    api_key=os.environ["AZURE_OPENAI_KEY"],
-    api_version="2024-12-01-preview"
-    azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"]
-)
+# ---------- Lazy Azure OpenAI Client ----------
+def get_aoai_client() -> AzureOpenAI:
+    """
+    Create the Azure OpenAI client only when needed.
+    This prevents startup crashes if config is wrong.
+    """
+    try:
+        return AzureOpenAI(
+            api_key=os.environ["AZURE_OPENAI_KEY"],
+            azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
+            api_version="2024-02-15-preview"  # pin version
+        )
+    except KeyError as e:
+        raise RuntimeError(f"Missing Azure OpenAI setting: {e}")
 
-aoai_deployment = os.environ["AZURE_OPENAI_DEPLOYMENT"]
+
+def get_aoai_deployment() -> str:
+    try:
+        return os.environ["AZURE_OPENAI_DEPLOYMENT"]
+    except KeyError as e:
+        raise RuntimeError(f"Missing Azure OpenAI deployment setting: {e}")
 
 
 # ---------- DB connection ----------
@@ -37,7 +50,6 @@ def get_conn():
 def call_search(conn, query: str, top_k: int = 5):
     """
     Calls vector search stored procedure in SQL Server.
-    SQL Server performs semantic retrieval (NOT the LLM).
     """
     with conn.cursor() as cur:
         cur.execute("EXEC dbo.search_restaurants ?, ?", (query, top_k))
@@ -75,11 +87,6 @@ def remove_null_fields(row: dict) -> dict:
 
 # ---------- Build RAG Context ----------
 def build_context(rows: list[dict]) -> str:
-    """
-    Converts SQL results into grounded evidence for the LLM.
-    This is the key step that makes this Retrieval-Augmented Generation.
-    """
-
     blocks = []
 
     for r in rows:
@@ -106,12 +113,11 @@ Customer feedback:
 
 # ---------- Generation Step ----------
 def generate_answer(question: str, context: str) -> str:
-    """
-    Sends retrieved context to Azure OpenAI to generate a grounded answer.
-    The model is forbidden from inventing data.
-    """
+    try:
+        client = get_aoai_client()
+        deployment = get_aoai_deployment()
 
-    system_prompt = """
+        system_prompt = """
 You are Burrito Bot, an assistant that recommends Mexican restaurants.
 
 STRICT RULES:
@@ -119,10 +125,9 @@ STRICT RULES:
 - Do NOT make up restaurants or facts.
 - If unsure, say you don't know.
 - Keep answers friendly and concise.
-- Base recommendations on the reviews provided.
 """
 
-    user_prompt = f"""
+        user_prompt = f"""
 User Question:
 {question}
 
@@ -130,19 +135,23 @@ Context:
 {context}
 """
 
-    response = aoai_client.chat.completions.create(
-        model=aoai_deployment,
-        temperature=0.2,  # low hallucination risk
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-    )
+        response = client.chat.completions.create(
+            model=deployment,
+            temperature=0.2,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+        )
 
-    return response.choices[0].message.content
+        return response.choices[0].message.content
+
+    except Exception as e:
+        # Fail gracefully instead of killing the API
+        return f"(LLM error: {e})"
 
 
-# ---------- Chat Endpoint (RAG Pipeline) ----------
+# ---------- Chat Endpoint ----------
 @app.post("/chat")
 def chat(payload: dict):
     q = (payload.get("question") or "").strip()
@@ -157,20 +166,13 @@ def chat(payload: dict):
     except Exception as ex:
         return JSONResponse(
             status_code=500,
-            content={"error": f"{type(ex).__name__}: {ex}"}
+            content={"error": f"SQL error: {ex}"}
         )
 
     if not rows:
         return {"answer": "No matches found.", "citations": []}
 
-    # 🔴 Retrieval → Context Building
     context = build_context(rows)
-
-    # 🔴 Generation
     answer = generate_answer(q, context)
 
-    # Return answer + traceable sources
-    return {
-        "answer": answer,
-        "citations": rows
-    }
+    return {"answer": answer, "citations": rows}
