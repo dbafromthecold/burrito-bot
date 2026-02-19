@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent  # folder where app.py lives
 # ---------- Azure OpenAI Client ----------
 aoai_client = AzureOpenAI(
     api_key=os.environ["AZURE_OPENAI_KEY"],
-    api_version=os.environ["AZURE_OPENAI_API_VERSION"],
+    api_version="2024-12-01-preview"
     azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"]
 )
 
