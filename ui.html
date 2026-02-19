@@ -85,6 +85,25 @@
 
     .muted { color:#9aa4b2; font-size:.9rem; }
     .err { color:#fca5a5; white-space:pre-wrap; }
+
+    /* ✅ LLM Answer Styling */
+    .ai-answer {
+      text-align: left;
+      line-height: 1.55;
+    }
+
+    .ai-answer ol {
+      padding-left: 22px;
+      margin-top: .5rem;
+    }
+
+    .ai-answer li {
+      margin-bottom: .4rem;
+    }
+
+    .ai-answer strong {
+      color: #ffffff;
+    }
   </style>
 </head>
 
@@ -113,28 +132,47 @@ const f = document.getElementById('f');
 const out = document.getElementById('out');
 const btn = document.getElementById('go');
 
+/* Escape for data rows (still needed) */
 function escapeHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+}
+
+/* ✅ Lightweight Markdown → HTML renderer for LLM output */
+function renderMarkdown(md) {
+  if (!md) return "";
+
+  let html = md;
+
+  // Bold **text**
+  html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
+  // Convert numbered lists
+  html = html.replace(/^\d+\.\s+(.*)$/gm, "<li>$1</li>");
+  html = html.replace(/(<li>.*<\/li>)/gs, "<ol>$1</ol>");
+
+  // Line breaks
+  html = html.replace(/\n/g, "<br>");
+
+  return html;
 }
 
 function render(items, answer) {
   out.innerHTML = '';
 
-  // ---------- AI Answer ----------
+  /* ✅ Render AI Answer */
   if (answer) {
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML =
-      '<div style="white-space:pre-wrap;">' +
-      escapeHtml(answer) +
+      '<div class="ai-answer">' +
+      renderMarkdown(answer) +
       '</div>';
     out.appendChild(card);
   }
 
   if (!items || !items.length) return;
 
-
-  // ---------- Render Retrieved Rows ----------
+  /* Render Retrieved Rows */
   for (const r of items) {
     const div = document.createElement('div');
     div.className = 'item';
@@ -145,14 +183,12 @@ function render(items, answer) {
     if (r.rating) header.push('<span class="muted">⭐ ' + escapeHtml(String(r.rating)) + '</span>');
 
     const kvs = Object.entries(r)
-      // Hide grounding-only fields
       .filter(([k,_]) => {
         const key = k.toLowerCase();
         return key !== "combined_reviews" && key !== "metadata_text";
       })
       .map(([k,v]) => {
         if (!v) return '';
-
         const key = k.toLowerCase();
 
         if (key === "address" || key === "phone") {
@@ -167,6 +203,7 @@ function render(items, answer) {
             </a>
           </div>`;
         }
+
         return `<span><b>${k}:</b> ${escapeHtml(String(v))}</span>`;
       }).join('');
 
