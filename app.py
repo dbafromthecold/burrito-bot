@@ -7,17 +7,24 @@ from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from openai import AzureOpenAI
 
 app = FastAPI()
-BASE_DIR = Path(__file__).resolve().parent  # folder where app.py lives
+BASE_DIR = Path(__file__).resolve().parent
 
 
-# ---------- Azure OpenAI Client ----------
-aoai_client = AzureOpenAI(
-    api_key=os.environ["AZURE_OPENAI_KEY"],
-    api_version="2024-12-01-preview",
-    azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"]
-)
+# ---------- Azure OpenAI (lazy init so startup can't fail) ----------
+def get_aoai_client() -> AzureOpenAI:
+    """
+    Create Azure OpenAI client only when needed.
+    Prevents App Service startup crashes.
+    """
+    return AzureOpenAI(
+        api_key=os.environ["AZURE_OPENAI_KEY"],
+        azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
+        api_version="2024-02-15-preview"
+    )
 
-aoai_deployment = os.environ["AZURE_OPENAI_DEPLOYMENT"]
+
+def get_aoai_deployment() -> str:
+    return os.environ["AZURE_OPENAI_DEPLOYMENT"]
 
 
 # ---------- DB connection ----------
@@ -77,7 +84,6 @@ def remove_null_fields(row: dict) -> dict:
 def build_context(rows: list[dict]) -> str:
     """
     Converts SQL results into grounded evidence for the LLM.
-    This is the key step that makes this Retrieval-Augmented Generation.
     """
 
     blocks = []
@@ -107,8 +113,7 @@ Customer feedback:
 # ---------- Generation Step ----------
 def generate_answer(question: str, context: str) -> str:
     """
-    Sends retrieved context to Azure OpenAI to generate a grounded answer.
-    The model is forbidden from inventing data.
+    Calls Azure OpenAI using grounded SQL context.
     """
 
     system_prompt = """
@@ -119,7 +124,6 @@ STRICT RULES:
 - Do NOT make up restaurants or facts.
 - If unsure, say you don't know.
 - Keep answers friendly and concise.
-- Base recommendations on the reviews provided.
 """
 
     user_prompt = f"""
@@ -130,9 +134,12 @@ Context:
 {context}
 """
 
-    response = aoai_client.chat.completions.create(
-        model=aoai_deployment,
-        temperature=0.2,  # low hallucination risk
+    client = get_aoai_client()
+    deployment = get_aoai_deployment()
+
+    response = client.chat.completions.create(
+        model=deployment,
+        temperature=0.2,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
@@ -157,19 +164,20 @@ def chat(payload: dict):
     except Exception as ex:
         return JSONResponse(
             status_code=500,
-            content={"error": f"{type(ex).__name__}: {ex}"}
+            content={"error": f"SQL error: {ex}"}
         )
 
     if not rows:
         return {"answer": "No matches found.", "citations": []}
 
-    # 🔴 Retrieval → Context Building
     context = build_context(rows)
 
-    # 🔴 Generation
-    answer = generate_answer(q, context)
+    try:
+        answer = generate_answer(q, context)
+    except Exception as e:
+        # Do not kill the API if AOAI fails
+        answer = f"(LLM unavailable: {e})"
 
-    # Return answer + traceable sources
     return {
         "answer": answer,
         "citations": rows
