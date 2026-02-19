@@ -4,28 +4,40 @@ import pyodbc
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+from openai import AzureOpenAI
 
 app = FastAPI()
-
 BASE_DIR = Path(__file__).resolve().parent  # folder where app.py lives
+
+
+# ---------- Azure OpenAI Client ----------
+aoai_client = AzureOpenAI(
+    api_key=os.environ.get("AZURE_OPEN_API_KEY"),
+    api_version=os.environ.get("AZURE_OPENAI_API_VERSION"),
+    azure_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT")
+)
+
+aoai_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT")
+
 
 # ---------- DB connection ----------
 def get_conn():
     return pyodbc.connect(
         driver="{ODBC Driver 18 for SQL Server}",
-        server=os.environ["SQL_SERVER"],          # e.g. tcp:vm.dns.name,1433
+        server=os.environ["SQL_SERVER"],
         database=os.environ.get("SQL_DB", ""),
         uid=os.environ["SQL_UID"],
         pwd=os.environ["SQL_PWD"],
         Encrypt="yes",
-        TrustServerCertificate="yes",             # VM without trusted cert
+        TrustServerCertificate="yes",
         timeout=30,
     )
 
+
 def call_search(conn, query: str, top_k: int = 5):
     """
-    Call the dbo.search_restaurants stored procedure.
-    Returns list[dict].
+    Calls vector search stored procedure in SQL Server.
+    SQL Server performs semantic retrieval (NOT the LLM).
     """
     with conn.cursor() as cur:
         cur.execute("EXEC dbo.search_restaurants ?, ?", (query, top_k))
@@ -41,14 +53,13 @@ def health():
     return {"status": "ok"}
 
 
-# ---------- Minimal web UI at "/" ----------
+# ---------- Serve UI ----------
 @app.get("/", response_class=HTMLResponse)
 def index():
-    """Serve the ui.html file instead of embedding HTML inline."""
     return FileResponse(BASE_DIR / "ui.html")
 
 
-# ---------- Removing NULLs ----------
+# ---------- Remove NULL / Junk Fields ----------
 def remove_null_fields(row: dict) -> dict:
     cleaned = {}
     for k, v in row.items():
@@ -61,17 +72,87 @@ def remove_null_fields(row: dict) -> dict:
         cleaned[k] = v
     return cleaned
 
-# ---------- JSON API ----------
+
+# ---------- Build RAG Context ----------
+def build_context(rows: list[dict]) -> str:
+    """
+    Converts SQL results into grounded evidence for the LLM.
+    This is the key step that makes this Retrieval-Augmented Generation.
+    """
+
+    blocks = []
+
+    for r in rows:
+        name = r.get("name") or r.get("Name")
+        city = r.get("city")
+        rating = r.get("rating")
+        review_count = r.get("review_count")
+        address = r.get("address")
+        reviews = r.get("combined_reviews") or r.get("metadata_text") or ""
+
+        block = f"""
+Restaurant: {name}
+City: {city}
+Rating: {rating} ({review_count} reviews)
+Address: {address}
+
+Customer feedback:
+{reviews}
+"""
+        blocks.append(block.strip())
+
+    return "\n\n---\n\n".join(blocks)
+
+
+# ---------- Generation Step ----------
+def generate_answer(question: str, context: str) -> str:
+    """
+    Sends retrieved context to Azure OpenAI to generate a grounded answer.
+    The model is forbidden from inventing data.
+    """
+
+    system_prompt = """
+You are Burrito Bot, an assistant that recommends Mexican restaurants.
+
+STRICT RULES:
+- Use ONLY the provided context.
+- Do NOT make up restaurants or facts.
+- If unsure, say you don't know.
+- Keep answers friendly and concise.
+- Base recommendations on the reviews provided.
+"""
+
+    user_prompt = f"""
+User Question:
+{question}
+
+Context:
+{context}
+"""
+
+    response = aoai_client.chat.completions.create(
+        model=aoai_deployment,
+        temperature=0.2,  # low hallucination risk
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+    )
+
+    return response.choices[0].message.content
+
+
+# ---------- Chat Endpoint (RAG Pipeline) ----------
 @app.post("/chat")
 def chat(payload: dict):
     q = (payload.get("question") or "").strip()
     top_k = int(payload.get("top_k") or 5)
+
     if not q:
         return {"answer": "Please ask a question.", "citations": []}
 
     try:
         with get_conn() as conn:
-           # rows = call_search(conn, q, top_k)
             rows = [remove_null_fields(r) for r in call_search(conn, q, top_k)]
     except Exception as ex:
         return JSONResponse(
@@ -82,11 +163,14 @@ def chat(payload: dict):
     if not rows:
         return {"answer": "No matches found.", "citations": []}
 
-    # Adjust field names if your proc returns different columns
-    lines = []
-    for r in rows:
-        name = r.get("Name") or r.get("restaurant") or r.get("title") or "(no name)"
-        city = r.get("city") or r.get("location") or ""
-        lines.append(f"- {name}" + (f" in {city}" if city else ""))
-    answer = "Top results:\n" + "\n".join(lines)
-    return {"answer": answer, "citations": rows}
+    # 🔴 Retrieval → Context Building
+    context = build_context(rows)
+
+    # 🔴 Generation
+    answer = generate_answer(q, context)
+
+    # Return answer + traceable sources
+    return {
+        "answer": answer,
+        "citations": rows
+    }
