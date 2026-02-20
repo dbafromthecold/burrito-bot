@@ -1,7 +1,8 @@
- 
+$CityName = "Waterford"
 
-$ApiKey = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-$restaurants = Import-Csv "C:\git\aipoweredsearch\Data\Raw Data\mexican_restaurants_Dublin.csv"
+
+$ApiKey = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+$restaurants = Import-Csv "C:\temp\restaurants\mexican_restaurants_placeids_$CityName.csv"
 
 $PlaceIDs= $restaurants.place_id
 

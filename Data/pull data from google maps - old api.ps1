@@ -1,7 +1,5 @@
 
-
-
-$ApiKey  = " XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+$ApiKey  = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 $Keyword = "mexican"
 $BaseUrl = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
 $Radius  = 20000
@@ -17,7 +15,7 @@ $Cities = @(
     @{ Name="Waterford"; Lat=52.2593; Lng=-7.1101 }
 )
 
-$CityName = "Waterford"
+$CityName = "Dublin"
 $City = $Cities | Where-Object { $_.Name -eq $CityName }
 $Latitude = $City.Lat
 $Longitude = $City.Lng
@@ -57,7 +55,7 @@ do {
 
 
 
-$Results.results.count
+$Results.types.editorial_summary
 
 
 
@@ -81,4 +79,3 @@ foreach ($Place in $Results) {
 $AllResults
 
 $AllResults | Export-Csv -Path "C:\temp\restaurants\mexican_restaurants_$CityName.csv" -NoTypeInformation -Encoding UTF8
-
