@@ -2,13 +2,6 @@
 
 ---
 
-<p align="center">
-<img src="images/datasat_chicago_sponsors.png" />
-</p>
-
-
----
-
 ## Andrew Pruski
 
 <img src="images/apruski.jpg" style="float: right"/>
@@ -453,9 +446,9 @@ FROM vector_search(
 ## Resources
 <!-- .slide: style="text-align: left;"> -->
 <font size="6">
-<a href="https://github.com/dbafromthecold/aipoweredsearch">https://github.com/dbafromthecold/aipoweredsearch</a><br>
+<a href="https://github.com/dbafromthecold/burrito-bot">https://github.com/dbafromthecold/burrito-bot</a><br>
 </font>
 
 <p align="center">
-<img src="images/aipoweredsearch_qrcode.jpg" />
+<img src="images/burrito-bot-qr-code.jpg" />
 </p>
