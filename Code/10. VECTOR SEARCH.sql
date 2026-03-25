@@ -21,31 +21,20 @@ GO
 
 
 
--- let's get the size of the table before we create that index
-EXEC sp_spaceused 'embeddings.restaurant_review_embeddings'
-GO
-
-
-
--- creating the index referencing the diskann algorithm (only one supported)
--- include the actual execution plan
+-- creating the index referencing the diskann algorithm
 CREATE VECTOR INDEX vec_idx ON [embeddings].[restaurant_review_embeddings]([embeddings])
 WITH (
     METRIC  = 'cosine', -- euclidean and dot also supported
-    TYPE    = 'diskann',
-    MAXDOP  = 8 -- set the parallelism of the create index operation - currently ignored!
+    TYPE    = 'diskann',-- only diskann supported
+    MAXDOP  = 8         -- set the parallelism of the create index operation - currently ignored!
 );
 GO
 
 
 
-/*************************************************************************************************
-let's inspect the data of that index
-DBCC IND
-DBCC PAGE
-
-
-*************************************************************************************************/
+-- here's the index!
+SELECT * FROM sys.vector_indexes;
+GO
 
 
 
@@ -56,12 +45,6 @@ INSERT INTO [embeddings].[restaurant_review_embeddings]
      VALUES
            (999
            ,NULL)
-GO
-
-
-
--- and let's have a look at the size of the table now
-EXEC sp_spaceused 'embeddings.restaurant_review_embeddings'
 GO
 
 
@@ -124,8 +107,7 @@ BEGIN
         r.[address] AS [Address], 
         r.[phone] AS [Phone Number], 
         r.[url] AS [URL],
-        vs.distance,
-        combined_reviews.reviews AS [combined_reviews]
+        vs.distance
     FROM VECTOR_SEARCH(
         TABLE      = [embeddings].[restaurant_review_embeddings] AS e,
         COLUMN     = [embeddings],
@@ -134,19 +116,6 @@ BEGIN
         TOP_N      = @num_results
     ) AS vs
     INNER JOIN [data].[restaurants] r ON r.id = e.restaurant_id
-    INNER JOIN (SELECT
-                    rv.restaurant_id as restaurant_id,
-                    CONCAT(
-                        d.name, ' is a Mexican restaurant in ', d.city, '. ',
-                        'Customer reviews say:', CHAR(13) + CHAR(10),
-                        STRING_AGG(
-                            ' - ' + REPLACE(rv.review_text, CHAR(13) + CHAR(10), ' '),
-                            CHAR(13) + CHAR(10)
-                        ) WITHIN GROUP (ORDER BY rv.review_published_utc)
-                    ) as reviews
-                FROM [data].[reviews] rv
-                INNER JOIN [data].[restaurants] d ON rv.restaurant_id = d.id
-                GROUP BY rv.restaurant_id, d.name, d.city) as combined_reviews ON r.id = combined_reviews.restaurant_id
     ORDER BY vs.distance;
 END
 GO
