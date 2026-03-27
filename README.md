@@ -4,6 +4,9 @@ Semantic similarity searching in SQL Server 2025 to provide burrito restaurant r
 
 # Resources
 
+Supporting blog post for this repository and session:<br>
+https://dbafromthecold.com/2026/03/27/the-burrito-bot-ai-powered-search-in-sql-server-2025/<br>
+<br>
 Slides for presentation are available here: <br>
 https://dbafromthecold.github.io/burrito-bot<br>
 <br>
