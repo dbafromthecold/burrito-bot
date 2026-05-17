@@ -11,7 +11,7 @@ The Burrito Bot demonstrates the practical application of vector embeddings and 
 ### Code Directory
 SQL Server scripts that comprise the complete data pipeline:
 
-- **`1. Create Database.sql`** - Database initialization and schema setup
+- **`1. Create Database.sql`** - Database initialisation and schema setup
 - **`2. Create Data Tables.sql`** - Main tables for storing restaurant and review data
 - **`3a. Pull Restaurant Metadata.sql`** - Scripts for retrieving restaurant metadata
 - **`3b. Pull Restaurant Reviews.sql`** - Scripts for retrieving restaurant reviews
