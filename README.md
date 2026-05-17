@@ -95,7 +95,7 @@ This repository welcomes contributions! If you have:
 
 Please submit a pull request with your changes.
 
-## 📄 License
+## 📄 Licence
 
 This project is provided as-is for educational and reference purposes.
 
