@@ -3,10 +3,15 @@
 * AI-Powered Search - Andrew Pruski
 * @dbafromthecold.com
 * dbafromthecold@gmail.com
-* https://github.com/dbafromthecold/aipoweredsearch
+* https://github.com/dbafromthecold/burrito-bot
 * Comparing search functions
 ***************************************************************************
 **************************************************************************/
+
+
+
+USE [burrito-bot-db];
+GO
 
 
 

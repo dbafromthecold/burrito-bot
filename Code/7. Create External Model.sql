@@ -3,7 +3,7 @@
 * AI-Powered Search - Andrew Pruski
 * @dbafromthecold.com
 * dbafromthecold@gmail.com
-* https://github.com/dbafromthecold/aipoweredsearch
+* https://github.com/dbafromthecold/burrito-bot
 * Create external model
 ***************************************************************************
 **************************************************************************/

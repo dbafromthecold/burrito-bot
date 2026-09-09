@@ -3,7 +3,7 @@
 * AI-Powered Search - Andrew Pruski
 * @dbafromthecold.com
 * dbafromthecold@gmail.com
-* https://github.com/dbafromthecold/aipoweredsearch
+* https://github.com/dbafromthecold/burrito-bot
 * Vector Distance
 ***************************************************************************
 **************************************************************************/
@@ -80,8 +80,7 @@ GO
 SELECT rv.restaurant_id, rv.review_text
 FROM [data].[reviews] rv
 INNER JOIN [data].[restaurants] r ON rv.restaurant_id = r.id
-WHERE r.name = 'Salsa - Authentic Mexican Food'
-AND r.city = 'Dublin'
+WHERE r.id = 136
 ORDER BY rv.restaurant_id ASC;
 GO
 
