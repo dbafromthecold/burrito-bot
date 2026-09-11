@@ -34,6 +34,12 @@ Starting from the ground up, we'll build an AI-Powered Search tool...
 
 ---
 
+<p align="center">
+<img src="images/Burrito-Bot-Gif.gif" />
+</p>
+
+---
+
 ## Querying Data
 <!-- .slide: style="text-align: left;"> -->
 "Find me a restaurant in 
@@ -44,6 +50,12 @@ with a
 <span class="fragment fade-in" data-fragment-index="3">
 "Find me a restaurant with a cozy atmosphere"
 </span>
+
+---
+
+<p align="center">
+<img src="images/Burrito-Bot-Gif-4.gif" />
+</p>
 
 ---
 
@@ -96,6 +108,36 @@ Semantic similarity search finds results with ***similar meaning***, even when t
 <li class="fragment">Generate embeddings</li>
 <li class="fragment">Search that data</li>
 </ul>
+
+---
+
+## Raw Data
+<!-- .slide: style="text-align: left;"> -->
+<p align="center">
+<img src="images/raw_data.png" />
+</p>
+
+---
+
+## Review Data
+<!-- .slide: style="text-align: left;"> -->
+<p align="center">
+<img src="images/review_data.png" />
+</p>
+
+---
+
+## Chunking Data
+<!-- .slide: style="text-align: left;" -->
+
+Design decisions when creating embeddings:
+- What text are we embedding?
+- What level of granularity should we use?
+
+Trade-offs:
+- Large chunks: embeddings become vague
+- Small chunks: loss of context
+- More chunks: computationally expensive
 
 ---
 
